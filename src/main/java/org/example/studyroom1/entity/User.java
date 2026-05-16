@@ -83,4 +83,9 @@ public class User implements Serializable {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    /**
+     * 是否是VIP会员
+     */
+    private boolean isVip;
 }
