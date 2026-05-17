@@ -9,7 +9,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 系统规则配置实体类
+ * 系统配置实体类
  */
 @Data
 @TableName("system_config")
@@ -18,7 +18,7 @@ public class SystemConfig implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 配置ID
+     * 主键ID
      */
     @TableId(value = "id", type = IdType.AUTO)
     private Integer id;
@@ -34,14 +34,19 @@ public class SystemConfig implements Serializable {
     private String configValue;
 
     /**
-     * 配置类型
-     */
-    private String configType;
-
-    /**
-     * 配置说明
+     * 配置描述
      */
     private String description;
+
+    /**
+     * 是否删除 0-否 1-是
+     */
+    private Integer isDeleted;
+
+    /**
+     * 创建时间
+     */
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
