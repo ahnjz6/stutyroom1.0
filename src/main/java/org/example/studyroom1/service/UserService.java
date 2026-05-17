@@ -1,19 +1,31 @@
 package org.example.studyroom1.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.example.studyroom1.dto.LoginRequest;
 import org.example.studyroom1.dto.LoginResponse;
+import org.example.studyroom1.dto.MessageListRequest;
+import org.example.studyroom1.dto.MessageReadResponse;
+import org.example.studyroom1.dto.MessageResponse;
+import org.example.studyroom1.dto.PageResponse;
+import org.example.studyroom1.dto.VipCardListResponse;
+import org.example.studyroom1.entity.Message;
 import org.example.studyroom1.entity.User;
 import org.example.studyroom1.entity.UserLoginLog;
 import org.example.studyroom1.entity.UserVipCard;
+import org.example.studyroom1.entity.VipCardType;
+import org.example.studyroom1.mapper.MessageMapper;
 import org.example.studyroom1.mapper.UserLoginLogMapper;
 import org.example.studyroom1.mapper.UserMapper;
 import org.example.studyroom1.mapper.UserVipCardMapper;
+import org.example.studyroom1.mapper.VipCardTypeMapper;
 import org.example.studyroom1.util.JwtUtil;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 用户服务类
@@ -25,6 +37,8 @@ public class UserService {
     private final UserMapper userMapper;
     private final UserLoginLogMapper userLoginLogMapper;
     private final UserVipCardMapper userVipCardMapper;
+    private final MessageMapper messageMapper;
+    private final VipCardTypeMapper vipCardTypeMapper;
     
     /**
      * 用户登录
@@ -134,5 +148,127 @@ public class UserService {
         log.setUserAgent("Unknown");
         
         userLoginLogMapper.insert(log);
+    }
+    
+    /**
+     * 获取用户消息列表（分页）
+     */
+    public PageResponse<MessageResponse> getMessageList(Long userId, MessageListRequest request) {
+        // 参数校验
+        if (request.getPage() == null || request.getPage() < 1) {
+            request.setPage(1);
+        }
+        if (request.getPageSize() == null || request.getPageSize() < 1) {
+            request.setPageSize(10);
+        }
+        
+        // 创建分页对象
+        Page<Message> page = new Page<>(request.getPage(), request.getPageSize());
+        
+        // 查询当前用户的消息，按创建时间倒序排列
+        Page<Message> messagePage = messageMapper.selectPage(
+            page,
+            new LambdaQueryWrapper<Message>()
+                .eq(Message::getUserId, userId)
+                .orderByDesc(Message::getCreateTime)
+        );
+        
+        // 转换为响应DTO
+        List<MessageResponse> messageResponses = messagePage.getRecords().stream()
+            .map(this::convertToMessageResponse)
+            .collect(Collectors.toList());
+        
+        // 构建分页响应
+        return new PageResponse<>(
+            messagePage.getTotal(),
+            (int) messagePage.getCurrent(),
+            (int) messagePage.getSize(),
+            messageResponses
+        );
+    }
+    
+    /**
+     * 转换Message实体为MessageResponse DTO
+     */
+    private MessageResponse convertToMessageResponse(Message message) {
+        MessageResponse response = new MessageResponse();
+        response.setId(message.getId());
+        response.setTitle(message.getTitle());
+        response.setContent(message.getContent());
+        response.setType(message.getMessageType());
+        response.setIsRead(message.getIsRead());
+        response.setCreateTime(message.getCreateTime());
+        return response;
+    }
+    
+    /**
+     * 获取VIP卡列表
+     */
+    public List<VipCardListResponse> getVipCardList() {
+        // 查询所有上架的VIP卡类型，按排序字段升序排列
+        List<VipCardType> vipCardTypes = vipCardTypeMapper.selectList(
+            new LambdaQueryWrapper<VipCardType>()
+                .eq(VipCardType::getStatus, 1) // 只查询上架的
+                .orderByAsc(VipCardType::getSortOrder)
+        );
+        
+        // 转换为响应DTO
+        return vipCardTypes.stream()
+            .map(this::convertToVipCardListResponse)
+            .collect(Collectors.toList());
+    }
+    
+    /**
+     * 转换VipCardType实体为VipCardListResponse DTO
+     */
+    private VipCardListResponse convertToVipCardListResponse(VipCardType vipCardType) {
+        VipCardListResponse response = new VipCardListResponse();
+        response.setId(vipCardType.getId());
+        response.setName(vipCardType.getName());
+        response.setType(vipCardType.getType());
+        response.setPrice(vipCardType.getPrice());
+        response.setMaxBookingHours(vipCardType.getMaxReservationHours());
+        response.setAdvanceDays(vipCardType.getAdvanceDays());
+        response.setViolationLimit(vipCardType.getViolationThreshold());
+        
+        // 根据卡类型设置duration字段
+        if (vipCardType.getType() == 1) {
+            // 次卡：duration表示可用次数
+            response.setDuration(vipCardType.getUsageCount());
+        } else {
+            // 月卡/年卡：duration表示有效期天数
+            response.setDuration(vipCardType.getDurationDays());
+        }
+        
+        return response;
+    }
+    
+    /**
+     * 将消息标记为已读
+     */
+    public MessageReadResponse markMessageAsRead(Long userId, Long messageId) {
+        // 查询消息
+        Message message = messageMapper.selectById(messageId);
+        
+        if (message == null) {
+            throw new RuntimeException("消息不存在");
+        }
+        
+        // 验证消息是否属于当前用户
+        if (!message.getUserId().equals(userId)) {
+            throw new RuntimeException("无权操作此消息");
+        }
+        
+        // 如果已经是已读状态，直接返回
+        if (message.getIsRead() == 1) {
+            return new MessageReadResponse(messageId, 1);
+        }
+        
+        // 更新为已读状态
+        message.setIsRead(1);
+        message.setReadTime(LocalDateTime.now());
+        messageMapper.updateById(message);
+        
+        return new MessageReadResponse(messageId, 1);
     }
 }
