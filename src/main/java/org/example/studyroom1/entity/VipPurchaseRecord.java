@@ -35,19 +35,9 @@ public class VipPurchaseRecord implements Serializable {
     private Integer cardTypeId;
 
     /**
-     * 订单号
-     */
-    private String orderNo;
-
-    /**
-     * 支付金额
+     * 购买金额
      */
     private BigDecimal amount;
-
-    /**
-     * 支付状态：0待支付 1已支付 2已退款
-     */
-    private Integer payStatus;
 
     /**
      * 支付时间

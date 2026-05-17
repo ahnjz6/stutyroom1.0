@@ -8,18 +8,23 @@ import org.example.studyroom1.dto.LoginResponse;
 import org.example.studyroom1.dto.MessageListRequest;
 import org.example.studyroom1.dto.MessageReadResponse;
 import org.example.studyroom1.dto.MessageResponse;
+import org.example.studyroom1.dto.MyVipInfoResponse;
 import org.example.studyroom1.dto.PageResponse;
+import org.example.studyroom1.dto.PurchaseVipRequest;
+import org.example.studyroom1.dto.PurchaseVipResponse;
 import org.example.studyroom1.dto.VipCardListResponse;
 import org.example.studyroom1.entity.Message;
 import org.example.studyroom1.entity.User;
 import org.example.studyroom1.entity.UserLoginLog;
 import org.example.studyroom1.entity.UserVipCard;
 import org.example.studyroom1.entity.VipCardType;
+import org.example.studyroom1.entity.VipPurchaseRecord;
 import org.example.studyroom1.mapper.MessageMapper;
 import org.example.studyroom1.mapper.UserLoginLogMapper;
 import org.example.studyroom1.mapper.UserMapper;
 import org.example.studyroom1.mapper.UserVipCardMapper;
 import org.example.studyroom1.mapper.VipCardTypeMapper;
+import org.example.studyroom1.mapper.VipPurchaseRecordMapper;
 import org.example.studyroom1.util.JwtUtil;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +44,7 @@ public class UserService {
     private final UserVipCardMapper userVipCardMapper;
     private final MessageMapper messageMapper;
     private final VipCardTypeMapper vipCardTypeMapper;
+    private final VipPurchaseRecordMapper vipPurchaseRecordMapper;
     
     /**
      * 用户登录
@@ -270,5 +276,133 @@ public class UserService {
         messageMapper.updateById(message);
         
         return new MessageReadResponse(messageId, 1);
+    }
+    
+    /**
+     * 获取用户VIP信息
+     */
+    public MyVipInfoResponse getMyVipInfo(Long userId) {
+        MyVipInfoResponse response = new MyVipInfoResponse();
+        
+        // 查询用户当前生效的VIP卡
+        UserVipCard userVipCard = userVipCardMapper.selectOne(
+            new LambdaQueryWrapper<UserVipCard>()
+                .eq(UserVipCard::getUserId, userId)
+                .eq(UserVipCard::getStatus, 1) // 生效中
+                .le(UserVipCard::getStartTime, LocalDateTime.now())
+                .ge(UserVipCard::getEndTime, LocalDateTime.now())
+                .orderByDesc(UserVipCard::getEndTime)
+                .last("LIMIT 1")
+        );
+        
+        if (userVipCard == null) {
+            // 用户没有生效的VIP卡
+            response.setIsVip(0);
+            response.setCardName("");
+            response.setExpireTime(null);
+            response.setRemainingTimes(0);
+            response.setLevel(0);
+        } else {
+            // 用户有生效的VIP卡
+            response.setIsVip(1);
+            response.setExpireTime(userVipCard.getEndTime());
+            response.setRemainingTimes(userVipCard.getRemainingCount() != null ? userVipCard.getRemainingCount() : 0);
+            
+            // 查询VIP卡类型信息
+            VipCardType vipCardType = vipCardTypeMapper.selectById(userVipCard.getCardTypeId());
+            if (vipCardType != null) {
+                response.setCardName(vipCardType.getName());
+                response.setLevel(vipCardType.getType());
+            } else {
+                response.setCardName("");
+                response.setLevel(0);
+            }
+        }
+        
+        return response;
+    }
+    
+    /**
+     * 用户购买VIP
+     */
+    public PurchaseVipResponse purchaseVip(Long userId, PurchaseVipRequest request) {
+        // 参数校验
+        if (request.getCardTypeId() == null) {
+            throw new RuntimeException("请选择VIP卡类型");
+        }
+        
+        // 查询VIP卡类型是否存在且上架
+        VipCardType vipCardType = vipCardTypeMapper.selectById(request.getCardTypeId());
+        if (vipCardType == null) {
+            throw new RuntimeException("VIP卡类型不存在");
+        }
+        if (vipCardType.getStatus() != 1) {
+            throw new RuntimeException("该VIP卡已下架");
+        }
+        
+        // 检查用户是否有生效中的VIP卡，不允许重复购买
+        Long activeVipCount = userVipCardMapper.selectCount(
+            new LambdaQueryWrapper<UserVipCard>()
+                .eq(UserVipCard::getUserId, userId)
+                .eq(UserVipCard::getStatus, 1) // 生效中
+                .le(UserVipCard::getStartTime, LocalDateTime.now())
+                .ge(UserVipCard::getEndTime, LocalDateTime.now())
+        );
+        
+        if (activeVipCount > 0) {
+            throw new RuntimeException("您已有生效中的VIP卡，无法重复购买");
+        }
+        
+        // 计算VIP卡的生效时间和失效时间
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startTime = now;
+        LocalDateTime endTime;
+        
+        // 根据卡类型计算结束时间
+        if (vipCardType.getType() == 1) {
+            // 次卡：有效期30天
+            endTime = now.plusDays(30);
+        } else if (vipCardType.getType() == 2) {
+            // 月卡：有效期30天
+            endTime = now.plusDays(30);
+        } else if (vipCardType.getType() == 3) {
+            // 年卡：有效期365天
+            endTime = now.plusDays(365);
+        } else {
+            throw new RuntimeException("不支持的VIP卡类型");
+        }
+        
+        // 创建购买记录
+        VipPurchaseRecord purchaseRecord = new VipPurchaseRecord();
+        purchaseRecord.setUserId(userId);
+        purchaseRecord.setCardTypeId(request.getCardTypeId());
+        purchaseRecord.setAmount(vipCardType.getPrice());
+        purchaseRecord.setPayTime(now);
+        purchaseRecord.setCreateTime(now);
+        purchaseRecord.setUpdateTime(now);
+        
+        vipPurchaseRecordMapper.insert(purchaseRecord);
+        
+        // 创建用户VIP卡记录
+        UserVipCard userVipCard = new UserVipCard();
+        userVipCard.setUserId(userId);
+        userVipCard.setCardTypeId(request.getCardTypeId());
+        userVipCard.setStartTime(startTime);
+        userVipCard.setEndTime(endTime);
+        userVipCard.setStatus(1); // 生效中
+        userVipCard.setCreateTime(now);
+        userVipCard.setUpdateTime(now);
+        
+        // 如果是次卡，设置剩余次数
+        if (vipCardType.getType() == 1) {
+            userVipCard.setRemainingCount(vipCardType.getUsageCount());
+        } else {
+            userVipCard.setRemainingCount(null);
+        }
+        
+        userVipCardMapper.insert(userVipCard);
+        
+        // 返回订单号（购买记录ID）
+        return new PurchaseVipResponse(purchaseRecord.getId());
     }
 }
