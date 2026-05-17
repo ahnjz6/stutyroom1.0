@@ -7,6 +7,7 @@ import org.example.studyroom1.dto.LoginResponse;
 import org.example.studyroom1.dto.MessageListRequest;
 import org.example.studyroom1.dto.MessageReadResponse;
 import org.example.studyroom1.dto.MessageResponse;
+import org.example.studyroom1.dto.MyVipInfoResponse;
 import org.example.studyroom1.dto.PageResponse;
 import org.example.studyroom1.dto.VipCardListResponse;
 import org.example.studyroom1.service.UserService;
@@ -107,6 +108,28 @@ public class UserController {
         try {
             List<VipCardListResponse> list = userService.getVipCardList();
             return Result.success(list);
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 查询我的VIP信息
+     */
+    @GetMapping("/vip/myVip")
+    public Result<MyVipInfoResponse> getMyVipInfo(
+            @RequestHeader("Authorization") String authorization) {
+        try {
+            // 从 Token 中获取 userId
+            String token = authorization.replace("Bearer ", "");
+            Long userId = JwtUtil.getUserIdFromToken(token);
+            
+            if (userId == null) {
+                return Result.error("无效的Token");
+            }
+            
+            MyVipInfoResponse response = userService.getMyVipInfo(userId);
+            return Result.success(response);
         } catch (RuntimeException e) {
             return Result.error(e.getMessage());
         }

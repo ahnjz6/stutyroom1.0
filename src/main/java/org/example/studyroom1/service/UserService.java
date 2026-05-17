@@ -8,6 +8,7 @@ import org.example.studyroom1.dto.LoginResponse;
 import org.example.studyroom1.dto.MessageListRequest;
 import org.example.studyroom1.dto.MessageReadResponse;
 import org.example.studyroom1.dto.MessageResponse;
+import org.example.studyroom1.dto.MyVipInfoResponse;
 import org.example.studyroom1.dto.PageResponse;
 import org.example.studyroom1.dto.VipCardListResponse;
 import org.example.studyroom1.entity.Message;
@@ -270,5 +271,49 @@ public class UserService {
         messageMapper.updateById(message);
         
         return new MessageReadResponse(messageId, 1);
+    }
+    
+    /**
+     * 获取用户VIP信息
+     */
+    public MyVipInfoResponse getMyVipInfo(Long userId) {
+        MyVipInfoResponse response = new MyVipInfoResponse();
+        
+        // 查询用户当前生效的VIP卡
+        UserVipCard userVipCard = userVipCardMapper.selectOne(
+            new LambdaQueryWrapper<UserVipCard>()
+                .eq(UserVipCard::getUserId, userId)
+                .eq(UserVipCard::getStatus, 1) // 生效中
+                .le(UserVipCard::getStartTime, LocalDateTime.now())
+                .ge(UserVipCard::getEndTime, LocalDateTime.now())
+                .orderByDesc(UserVipCard::getEndTime)
+                .last("LIMIT 1")
+        );
+        
+        if (userVipCard == null) {
+            // 用户没有生效的VIP卡
+            response.setIsVip(0);
+            response.setCardName("");
+            response.setExpireTime(null);
+            response.setRemainingTimes(0);
+            response.setLevel(0);
+        } else {
+            // 用户有生效的VIP卡
+            response.setIsVip(1);
+            response.setExpireTime(userVipCard.getEndTime());
+            response.setRemainingTimes(userVipCard.getRemainingCount() != null ? userVipCard.getRemainingCount() : 0);
+            
+            // 查询VIP卡类型信息
+            VipCardType vipCardType = vipCardTypeMapper.selectById(userVipCard.getCardTypeId());
+            if (vipCardType != null) {
+                response.setCardName(vipCardType.getName());
+                response.setLevel(vipCardType.getType());
+            } else {
+                response.setCardName("");
+                response.setLevel(0);
+            }
+        }
+        
+        return response;
     }
 }
