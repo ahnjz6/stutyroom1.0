@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import com.baomidou.mybatisplus.annotation.TableField;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -36,11 +37,13 @@ public class Seat implements Serializable {
     /**
      * 行号
      */
+    @TableField("`row_number`")
     private Integer rowNumber;
 
     /**
      * 列号
      */
+    @TableField("`col_number`")
     private Integer colNumber;
 
     /**

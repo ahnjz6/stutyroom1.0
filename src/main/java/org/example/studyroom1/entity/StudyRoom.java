@@ -65,16 +65,6 @@ public class StudyRoom implements Serializable {
     private Integer status;
 
     /**
-     * 安静程度：1-5
-     */
-    private Integer quietLevel;
-
-    /**
-     * 排序优先级
-     */
-    private Integer sortOrder;
-
-    /**
      * 创建时间
      */
     private LocalDateTime createTime;
