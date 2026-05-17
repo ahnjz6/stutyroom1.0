@@ -1,5 +1,6 @@
 package org.example.studyroom1.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 /**
@@ -31,10 +32,12 @@ public class CreateStudyRoomRequest {
     /**
      * 总行数
      */
+    @JsonProperty("total_row")
     private Integer totalRow;
     
     /**
      * 总列数
      */
+    @JsonProperty("total_col")
     private Integer totalCol;
 }

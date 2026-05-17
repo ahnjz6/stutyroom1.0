@@ -12,7 +12,10 @@ import org.example.studyroom1.dto.PageResponse;
 import org.example.studyroom1.dto.PurchaseVipRequest;
 import org.example.studyroom1.dto.PurchaseVipResponse;
 import org.example.studyroom1.dto.VipCardListResponse;
+import org.example.studyroom1.dto.CheckinRequest;
+import org.example.studyroom1.dto.CheckoutRequest;
 import org.example.studyroom1.service.UserService;
+import org.example.studyroom1.service.StudyRoomService;
 import org.example.studyroom1.util.JwtUtil;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,6 +30,7 @@ import java.util.List;
 public class UserController {
     
     private final UserService userService;
+    private final StudyRoomService studyRoomService;
     
     /**
      * 用户登录
@@ -157,6 +161,66 @@ public class UserController {
             return Result.success("购买成功", response);
         } catch (RuntimeException e) {
             return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 用户签到
+     */
+    @PostMapping("/checkin")
+    public Result<Object> checkin(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody CheckinRequest request) {
+        try {
+            // 从 Token 中验证用户身份
+            String token = authorization.replace("Bearer ", "");
+            Long userId = JwtUtil.getUserIdFromToken(token);
+            
+            if (userId == null) {
+                return Result.error("无效的Token");
+            }
+            
+            // 参数校验
+            if (request.getReservationId() == null) {
+                return Result.error("预约ID不能为空");
+            }
+            
+            studyRoomService.checkin(userId, request.getReservationId());
+            return Result.success("签到成功", new java.util.HashMap<>());
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("签到失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 用户签退
+     */
+    @PostMapping("/checkout")
+    public Result<Object> checkout(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody CheckoutRequest request) {
+        try {
+            // 从 Token 中验证用户身份
+            String token = authorization.replace("Bearer ", "");
+            Long userId = JwtUtil.getUserIdFromToken(token);
+            
+            if (userId == null) {
+                return Result.error("无效的Token");
+            }
+            
+            // 参数校验
+            if (request.getReservationId() == null) {
+                return Result.error("预约ID不能为空");
+            }
+            
+            studyRoomService.checkout(userId, request.getReservationId());
+            return Result.success("签退成功", new java.util.HashMap<>());
+        } catch (RuntimeException e) {
+            return Result.error(e.getMessage());
+        } catch (Exception e) {
+            return Result.error("签退失败：" + e.getMessage());
         }
     }
 }

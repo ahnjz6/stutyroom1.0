@@ -7,6 +7,7 @@ import org.example.studyroom1.dto.CreateStudyRoomRequest;
 import org.example.studyroom1.dto.SeatResponse;
 import org.example.studyroom1.entity.StudyRoom;
 import org.example.studyroom1.service.StudyRoomService;
+import org.example.studyroom1.util.JwtUtil;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -24,8 +25,17 @@ public class AdminStudyRoomController {
      * 查看自习室列表
      */
     @GetMapping("/list")
-    public Result<List<AdminStudyRoomResponse>> getStudyRoomList() {
+    public Result<List<AdminStudyRoomResponse>> getStudyRoomList(
+            @RequestHeader("Authorization") String authorization) {
         try {
+            // 从 Token 中验证管理员身份
+            String token = authorization.replace("Bearer ", "");
+            Long adminId = JwtUtil.getUserIdFromToken(token);
+            
+            if (adminId == null) {
+                return Result.error("无效的Token");
+            }
+            
             List<AdminStudyRoomResponse> list = studyRoomService.getAdminStudyRoomList();
             return Result.success("获取成功", list);
         } catch (Exception e) {
@@ -37,8 +47,18 @@ public class AdminStudyRoomController {
      * 查看座位列表
      */
     @GetMapping("/{roomId}/seat/list")
-    public Result<List<SeatResponse>> getSeatList(@PathVariable("roomId") Long roomId) {
+    public Result<List<SeatResponse>> getSeatList(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("roomId") Long roomId) {
         try {
+            // 从 Token 中验证管理员身份
+            String token = authorization.replace("Bearer ", "");
+            Long adminId = JwtUtil.getUserIdFromToken(token);
+            
+            if (adminId == null) {
+                return Result.error("无效的Token");
+            }
+            
             // 参数校验
             if (roomId == null) {
                 return Result.error("自习室ID不能为空");
@@ -57,8 +77,18 @@ public class AdminStudyRoomController {
      * 新增自习室
      */
     @PostMapping("")
-    public Result<StudyRoom> createStudyRoom(@RequestBody CreateStudyRoomRequest request) {
+    public Result<StudyRoom> createStudyRoom(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody CreateStudyRoomRequest request) {
         try {
+            // 从 Token 中验证管理员身份
+            String token = authorization.replace("Bearer ", "");
+            Long adminId = JwtUtil.getUserIdFromToken(token);
+            
+            if (adminId == null) {
+                return Result.error("无效的Token");
+            }
+            
             // 参数校验
             if (request.getName() == null || request.getName().trim().isEmpty()) {
                 return Result.error("自习室名称不能为空");
@@ -90,9 +120,19 @@ public class AdminStudyRoomController {
      * 启动/禁用自习室
      */
     @PostMapping("/status/{status}")
-    public Result<Object> updateStudyRoomStatus(@RequestParam("id") Long id, 
-                                                 @PathVariable("status") Integer status) {
+    public Result<Object> updateStudyRoomStatus(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam("id") Long id, 
+            @PathVariable("status") Integer status) {
         try {
+            // 从 Token 中验证管理员身份
+            String token = authorization.replace("Bearer ", "");
+            Long adminId = JwtUtil.getUserIdFromToken(token);
+            
+            if (adminId == null) {
+                return Result.error("无效的Token");
+            }
+            
             // 参数校验
             if (id == null) {
                 return Result.error("自习室ID不能为空");
